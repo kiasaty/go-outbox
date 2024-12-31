@@ -11,8 +11,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 )
 
+type SQSClient interface {
+	SendMessage(ctx context.Context, params *sqs.SendMessageInput, optFns ...func(*sqs.Options)) (*sqs.SendMessageOutput, error)
+}
+
 type SQSPublisher struct {
-	client   *sqs.Client
+	client   SQSClient
 	queueURL string
 }
 
