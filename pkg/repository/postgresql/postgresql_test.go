@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"testing"
+	"time"
 
 	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
@@ -16,14 +17,27 @@ import (
 var testDB *sql.DB
 
 func TestMain(m *testing.M) {
+	setupDatabase()
+
+	// Run tests
+	code := m.Run()
+
+	teardownDatabase()
+
+	os.Exit(code)
+}
+
+func setupDatabase() {
 	var err error
+
 	// Connect to PostgreSQL test database
 	testDB, err = sql.Open("postgres", "host=localhost port=5432 user=postgres password=secret dbname=testdb sslmode=disable")
+
 	if err != nil {
 		log.Fatalf("Failed to connect to test database: %v", err)
 	}
 
-	// Create test table
+	// Create outbox table
 	_, err = testDB.Exec(`
 		CREATE TABLE IF NOT EXISTS outbox (
 			id SERIAL PRIMARY KEY,
@@ -32,26 +46,44 @@ func TestMain(m *testing.M) {
 			created_at TIMESTAMP DEFAULT NOW()
 		)
 	`)
+
 	if err != nil {
 		log.Fatalf("Failed to create test table: %v", err)
 	}
+}
 
-	// Run tests
-	code := m.Run()
-
-	// Clean up database
+func teardownDatabase() {
 	_, _ = testDB.Exec(`DROP TABLE IF EXISTS outbox`)
-	testDB.Close()
 
-	os.Exit(code)
+	testDB.Close()
+}
+
+func setupTest(t *testing.T) (*sql.Tx, context.Context) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	t.Cleanup(cancel) // Ensure the timeout context is canceled after the test
+
+	// Begin a database transaction before each test.
+	tx, err := testDB.BeginTx(ctx, &sql.TxOptions{
+		Isolation: sql.LevelSerializable,
+	})
+	require.NoError(t, err, "Failed to start transaction")
+
+	// Rollback the database transaction after the test.
+	t.Cleanup(func() {
+		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+			t.Errorf("Failed to rollback transaction: %v", err)
+		}
+	})
+
+	return tx, ctx
 }
 
 func TestSaveMessage(t *testing.T) {
-	repo := PostgresRepository{
-		db: testDB,
-	}
+	tx, ctx := setupTest(t)
 
-	ctx := context.Background()
+	repo := PostgresRepository{
+		db: tx,
+	}
 
 	message := core.OutboxMessage{
 		ID:      "1",
@@ -63,19 +95,20 @@ func TestSaveMessage(t *testing.T) {
 	require.NoError(t, err, "Failed to save message")
 
 	var count int
-	err = testDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM outbox WHERE id = $1`, message.ID).Scan(&count)
+	err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM outbox WHERE id = $1`, message.ID).Scan(&count)
 	require.NoError(t, err)
 	assert.Equal(t, 1, count, "Message was not saved correctly")
 }
 
 func TestFetchPendingMessages(t *testing.T) {
+	tx, ctx := setupTest(t)
+
 	repo := PostgresRepository{
-		db: testDB,
+		db: tx,
 	}
 
-	ctx := context.Background()
-
-	_, err := testDB.ExecContext(ctx, `
+	// Insert sample pending messages
+	_, err := tx.ExecContext(ctx, `
 		INSERT INTO outbox (id, payload, status) 
 		VALUES ($1, $2, $3), ($4, $5, $6)`,
 		"2", "Payload 1", "pending",
@@ -92,14 +125,14 @@ func TestFetchPendingMessages(t *testing.T) {
 }
 
 func TestMarkMessageAsSent(t *testing.T) {
+	tx, ctx := setupTest(t)
+
 	repo := PostgresRepository{
-		db: testDB,
+		db: tx,
 	}
 
-	ctx := context.Background()
-
 	// Insert a pending message
-	_, err := testDB.ExecContext(ctx, `
+	_, err := tx.ExecContext(ctx, `
 		INSERT INTO outbox (id, payload, status) 
 		VALUES ($1, $2, $3)`,
 		"4", "Payload Sent", "pending",
@@ -112,20 +145,20 @@ func TestMarkMessageAsSent(t *testing.T) {
 
 	// Verify in database
 	var status string
-	err = testDB.QueryRowContext(ctx, `SELECT status FROM outbox WHERE id = $1`, "4").Scan(&status)
+	err = tx.QueryRowContext(ctx, `SELECT status FROM outbox WHERE id = $1`, "4").Scan(&status)
 	require.NoError(t, err)
 	assert.Equal(t, "sent", status, "Message status was not updated to sent")
 }
 
 func TestMarkMessageAsFailed(t *testing.T) {
+	tx, ctx := setupTest(t)
+
 	repo := PostgresRepository{
-		db: testDB,
+		db: tx,
 	}
 
-	ctx := context.Background()
-
 	// Insert a pending message
-	_, err := testDB.ExecContext(ctx, `
+	_, err := tx.ExecContext(ctx, `
 		INSERT INTO outbox (id, payload, status) 
 		VALUES ($1, $2, $3)`,
 		"5", "Payload Failed", "pending",
@@ -138,7 +171,7 @@ func TestMarkMessageAsFailed(t *testing.T) {
 
 	// Verify in database
 	var status string
-	err = testDB.QueryRowContext(ctx, `SELECT status FROM outbox WHERE id = $1`, "5").Scan(&status)
+	err = tx.QueryRowContext(ctx, `SELECT status FROM outbox WHERE id = $1`, "5").Scan(&status)
 	require.NoError(t, err)
 	assert.Equal(t, "failed", status, "Message status was not updated to failed")
 }

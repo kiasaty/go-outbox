@@ -6,8 +6,14 @@ import (
 	"go-transactional-outbox/pkg/core"
 )
 
+// SQLExecutor represents shared methods between *sql.DB and *sql.Tx
+type SQLExecutor interface {
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
+}
+
 type PostgresRepository struct {
-	db *sql.DB
+	db SQLExecutor
 }
 
 func (r *PostgresRepository) SaveMessage(ctx context.Context, message core.OutboxMessage) error {
