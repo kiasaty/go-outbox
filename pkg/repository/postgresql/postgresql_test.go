@@ -88,7 +88,7 @@ func TestSaveMessage(t *testing.T) {
 	message := core.OutboxMessage{
 		ID:      "1",
 		Payload: "Test Payload",
-		Status:  "pending",
+		Status:  core.MessageStatusPending,
 	}
 
 	err := repo.SaveMessage(ctx, message)
@@ -111,8 +111,8 @@ func TestFetchPendingMessages(t *testing.T) {
 	_, err := tx.ExecContext(ctx, `
 		INSERT INTO outbox (id, payload, status) 
 		VALUES ($1, $2, $3), ($4, $5, $6)`,
-		"2", "Payload 1", "pending",
-		"3", "Payload 2", "pending",
+		"2", "Payload 1", core.MessageStatusPending,
+		"3", "Payload 2", core.MessageStatusPending,
 	)
 	require.NoError(t, err)
 
@@ -135,7 +135,7 @@ func TestMarkMessageAsSent(t *testing.T) {
 	_, err := tx.ExecContext(ctx, `
 		INSERT INTO outbox (id, payload, status) 
 		VALUES ($1, $2, $3)`,
-		"4", "Payload Sent", "pending",
+		"4", "Payload Sent", core.MessageStatusPending,
 	)
 	require.NoError(t, err)
 
@@ -147,7 +147,7 @@ func TestMarkMessageAsSent(t *testing.T) {
 	var status string
 	err = tx.QueryRowContext(ctx, `SELECT status FROM outbox WHERE id = $1`, "4").Scan(&status)
 	require.NoError(t, err)
-	assert.Equal(t, "sent", status, "Message status was not updated to sent")
+	assert.Equal(t, core.MessageStatusSent, status, "Message status was not updated to sent")
 }
 
 func TestMarkMessageAsFailed(t *testing.T) {
@@ -161,7 +161,7 @@ func TestMarkMessageAsFailed(t *testing.T) {
 	_, err := tx.ExecContext(ctx, `
 		INSERT INTO outbox (id, payload, status) 
 		VALUES ($1, $2, $3)`,
-		"5", "Payload Failed", "pending",
+		"5", "Payload Failed", core.MessageStatusPending,
 	)
 	require.NoError(t, err)
 
@@ -173,5 +173,5 @@ func TestMarkMessageAsFailed(t *testing.T) {
 	var status string
 	err = tx.QueryRowContext(ctx, `SELECT status FROM outbox WHERE id = $1`, "5").Scan(&status)
 	require.NoError(t, err)
-	assert.Equal(t, "failed", status, "Message status was not updated to failed")
+	assert.Equal(t, core.MessageStatusFailed, status, "Message status was not updated to failed")
 }

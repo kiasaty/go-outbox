@@ -3,13 +3,21 @@ package core
 import "time"
 
 type OutboxMessage struct {
-	ID          string    `json:"id"`
-	Payload     string    `json:"payload"`
-	Status      string    `json:"status"`
-	Attempts    uint8     `json:"attempts"`
-	AvailableAt time.Time `json:"available_at"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID          string        `json:"id"`
+	Payload     string        `json:"payload"`
+	Status      MessageStatus `json:"status"`
+	Attempts    uint8         `json:"attempts"`
+	AvailableAt time.Time     `json:"available_at"`
+	CreatedAt   time.Time     `json:"created_at"`
 }
+
+type MessageStatus string
+
+const (
+	MessageStatusPending MessageStatus = "pending"
+	MessageStatusSent    MessageStatus = "sent"
+	MessageStatusFailed  MessageStatus = "failed"
+)
 
 func (m *OutboxMessage) GetRetryAttempts() uint8 {
 	if m.Attempts == 0 {

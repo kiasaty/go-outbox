@@ -57,8 +57,8 @@ func TestDefaultOutboxMessageDispatcher_Success(t *testing.T) {
 	ctx := context.Background()
 
 	messages := []core.OutboxMessage{
-		{ID: "1", Payload: "Test Message 1", Status: "pending"},
-		{ID: "2", Payload: "Test Message 2", Status: "pending"},
+		{ID: "1", Payload: "Test Message 1", Status: core.MessageStatusPending},
+		{ID: "2", Payload: "Test Message 2", Status: core.MessageStatusPending},
 	}
 
 	mockRepo.On("FetchPendingMessages", ctx, dispatcher.configs.FetchLimit).Return(messages, nil)
@@ -87,8 +87,8 @@ func TestDefaultOutboxMessageDispatcher_PartialFailure(t *testing.T) {
 	ctx := context.Background()
 
 	messages := []core.OutboxMessage{
-		{ID: "1", Payload: "Test Message 1", Status: "pending"},
-		{ID: "2", Payload: "Test Message 2", Status: "pending"},
+		{ID: "1", Payload: "Test Message 1", Status: core.MessageStatusPending},
+		{ID: "2", Payload: "Test Message 2", Status: core.MessageStatusPending},
 	}
 
 	mockRepo.On("FetchPendingMessages", ctx, dispatcher.configs.FetchLimit).Return(messages, nil)

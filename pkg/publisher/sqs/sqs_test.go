@@ -35,7 +35,7 @@ func TestSQSPublisher_Publish_Success(t *testing.T) {
 	testMessage := core.OutboxMessage{
 		ID:      "123",
 		Payload: "Test Payload",
-		Status:  "pending",
+		Status:  core.MessageStatusPending,
 	}
 
 	mockClient.On("SendMessage", mock.Anything, mock.MatchedBy(func(input *sqs.SendMessageInput) bool {
@@ -65,7 +65,7 @@ func TestSQSPublisher_Publish_Failure(t *testing.T) {
 	testMessage := core.OutboxMessage{
 		ID:      "123",
 		Payload: "Test Payload",
-		Status:  "pending",
+		Status:  core.MessageStatusPending,
 	}
 
 	fakeAwsSqsErrorMessage := "failed to send message"

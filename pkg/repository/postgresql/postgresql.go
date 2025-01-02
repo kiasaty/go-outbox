@@ -26,7 +26,7 @@ func (r *PostgresRepository) SaveMessage(ctx context.Context, message core.Outbo
 
 func (r *PostgresRepository) FetchPendingMessages(ctx context.Context, limit uint32) ([]core.OutboxMessage, error) {
 	rows, err := r.db.QueryContext(ctx,
-		"SELECT id, payload, status, attempts FROM outbox WHERE status = 'pending' and available_at <= NOW() LIMIT $1", limit)
+		"SELECT id, payload, status, attempts FROM outbox WHERE status = '$1' and available_at <= NOW() LIMIT $2", core.MessageStatusPending, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -45,11 +45,11 @@ func (r *PostgresRepository) FetchPendingMessages(ctx context.Context, limit uin
 }
 
 func (r *PostgresRepository) MarkMessageAsSent(ctx context.Context, id string, shouldIncrementAttempts bool) error {
-	return r.updateMessageStatus(ctx, id, "sent", shouldIncrementAttempts)
+	return r.updateMessageStatus(ctx, id, core.MessageStatusSent, shouldIncrementAttempts)
 }
 
 func (r *PostgresRepository) MarkMessageAsFailed(ctx context.Context, id string, shouldIncrementAttempts bool) error {
-	return r.updateMessageStatus(ctx, id, "failed", shouldIncrementAttempts)
+	return r.updateMessageStatus(ctx, id, core.MessageStatusFailed, shouldIncrementAttempts)
 }
 
 func (r *PostgresRepository) MarkMessageForRetry(ctx context.Context, id string, delay time.Duration, shouldIncrementAttempts bool) error {
@@ -63,12 +63,12 @@ func (r *PostgresRepository) MarkMessageForRetry(ctx context.Context, id string,
 
 	query += " WHERE id = $3;"
 
-	_, err := r.db.ExecContext(ctx, query, "pending", delay.Seconds(), id)
+	_, err := r.db.ExecContext(ctx, query, core.MessageStatusPending, delay.Seconds(), id)
 
 	return err
 }
 
-func (r *PostgresRepository) updateMessageStatus(ctx context.Context, id string, status string, shouldIncrementAttempts bool) error {
+func (r *PostgresRepository) updateMessageStatus(ctx context.Context, id string, status core.MessageStatus, shouldIncrementAttempts bool) error {
 	query := "UPDATE outbox SET status = '$1'"
 
 	if shouldIncrementAttempts {
