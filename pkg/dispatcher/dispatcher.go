@@ -9,6 +9,7 @@ import (
 type DefaultOutboxMessageDispatcher struct {
 	repository core.OutboxMessageRepository
 	publisher  core.OutboxMessagePublisher
+	configs    DispatcherConfigs
 }
 
 func (d *DefaultOutboxMessageDispatcher) Dispatch(ctx context.Context) error {
@@ -18,12 +19,30 @@ func (d *DefaultOutboxMessageDispatcher) Dispatch(ctx context.Context) error {
 	}
 
 	for _, message := range messages {
-		if err := d.publisher.Publish(ctx, message); err != nil {
-			_ = d.repository.MarkMessageAsFailed(ctx, message.ID, err.Error())
+		if message.GetRetryAttempts() >= d.configs.Retry.MaxRetryAttempts {
+			_ = d.repository.MarkMessageAsFailed(ctx, message.ID, false)
 			continue
 		}
 
-		_ = d.repository.MarkMessageAsSent(ctx, message.ID)
+		err := d.publisher.Publish(ctx, message)
+		message.Attempts += 1
+
+		if err != nil {
+			if message.GetRetryAttempts() < d.configs.Retry.MaxRetryAttempts {
+				_ = d.repository.MarkMessageForRetry(
+					ctx,
+					message.ID,
+					d.calculateRetryDelay(message.Attempts),
+					true,
+				)
+			} else {
+				_ = d.repository.MarkMessageAsFailed(ctx, message.ID, true)
+			}
+
+			continue
+		}
+
+		_ = d.repository.MarkMessageAsSent(ctx, message.ID, true)
 	}
 
 	return nil
