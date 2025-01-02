@@ -51,6 +51,7 @@ func TestDefaultOutboxMessageDispatcher_Success(t *testing.T) {
 	dispatcher := &DefaultOutboxMessageDispatcher{
 		repository: mockRepo,
 		publisher:  mockPub,
+		configs:    DefaultDispatcherConfigs(),
 	}
 
 	ctx := context.Background()
@@ -60,7 +61,7 @@ func TestDefaultOutboxMessageDispatcher_Success(t *testing.T) {
 		{ID: "2", Payload: "Test Message 2", Status: "pending"},
 	}
 
-	mockRepo.On("FetchPendingMessages", ctx, 10).Return(messages, nil)
+	mockRepo.On("FetchPendingMessages", ctx, dispatcher.configs.FetchLimit).Return(messages, nil)
 	mockPub.On("Publish", ctx, messages[0]).Return(nil)
 	mockPub.On("Publish", ctx, messages[1]).Return(nil)
 	mockRepo.On("MarkMessageAsSent", ctx, "1").Return(nil)
@@ -80,6 +81,7 @@ func TestDefaultOutboxMessageDispatcher_PartialFailure(t *testing.T) {
 	dispatcher := &DefaultOutboxMessageDispatcher{
 		repository: mockRepo,
 		publisher:  mockPub,
+		configs:    DefaultDispatcherConfigs(),
 	}
 
 	ctx := context.Background()
@@ -89,7 +91,7 @@ func TestDefaultOutboxMessageDispatcher_PartialFailure(t *testing.T) {
 		{ID: "2", Payload: "Test Message 2", Status: "pending"},
 	}
 
-	mockRepo.On("FetchPendingMessages", ctx, 10).Return(messages, nil)
+	mockRepo.On("FetchPendingMessages", ctx, dispatcher.configs.FetchLimit).Return(messages, nil)
 	mockPub.On("Publish", ctx, messages[0]).Return(nil)                             // First succeeds
 	mockPub.On("Publish", ctx, messages[1]).Return(errors.New("failed to publish")) // Second fails
 	mockRepo.On("MarkMessageAsSent", ctx, "1").Return(nil)
@@ -109,12 +111,13 @@ func TestDefaultOutboxMessageDispatcher_RepositoryFetchError(t *testing.T) {
 	dispatcher := &DefaultOutboxMessageDispatcher{
 		repository: mockRepo,
 		publisher:  mockPub,
+		configs:    DefaultDispatcherConfigs(),
 	}
 
 	ctx := context.Background()
 
 	errorMessage := "fetch error"
-	mockRepo.On("FetchPendingMessages", ctx, 10).Return([]core.OutboxMessage{}, errors.New(errorMessage))
+	mockRepo.On("FetchPendingMessages", ctx, dispatcher.configs.FetchLimit).Return([]core.OutboxMessage{}, errors.New(errorMessage))
 
 	err := dispatcher.Dispatch(ctx)
 	assert.Error(t, err)

@@ -24,7 +24,7 @@ func (r *PostgresRepository) SaveMessage(ctx context.Context, message core.Outbo
 	return err
 }
 
-func (r *PostgresRepository) FetchPendingMessages(ctx context.Context, limit int) ([]core.OutboxMessage, error) {
+func (r *PostgresRepository) FetchPendingMessages(ctx context.Context, limit uint32) ([]core.OutboxMessage, error) {
 	rows, err := r.db.QueryContext(ctx,
 		"SELECT id, payload, status, attempts FROM outbox WHERE status = 'pending' and available_at <= NOW() LIMIT $1", limit)
 	if err != nil {

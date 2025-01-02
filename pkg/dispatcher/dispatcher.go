@@ -13,7 +13,7 @@ type DefaultOutboxMessageDispatcher struct {
 }
 
 func (d *DefaultOutboxMessageDispatcher) Dispatch(ctx context.Context) error {
-	messages, err := d.repository.FetchPendingMessages(ctx, 10)
+	messages, err := d.repository.FetchPendingMessages(ctx, d.configs.FetchLimit)
 	if err != nil {
 		return fmt.Errorf("failed to fetch messages: %w", err)
 	}

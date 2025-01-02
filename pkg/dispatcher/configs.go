@@ -3,12 +3,14 @@ package dispatcher
 import "time"
 
 type DispatcherConfigs struct {
-	Retry RetryConfigs
+	Retry      RetryConfigs
+	FetchLimit uint32 // Maximum number of messages fetched per batch
 }
 
 func DefaultDispatcherConfigs() DispatcherConfigs {
 	return DispatcherConfigs{
-		Retry: DefaultRetryConfigs(),
+		Retry:      DefaultRetryConfigs(),
+		FetchLimit: 100,
 	}
 }
 
