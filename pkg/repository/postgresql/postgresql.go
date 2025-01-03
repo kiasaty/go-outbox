@@ -24,15 +24,56 @@ func (r *PostgresRepository) SaveMessage(ctx context.Context, message core.Outbo
 	return err
 }
 
-func (r *PostgresRepository) FetchPendingMessages(ctx context.Context, limit uint32) ([]core.OutboxMessage, error) {
-	rows, err := r.db.QueryContext(ctx,
-		"SELECT id, payload, status, attempts FROM outbox WHERE status = '$1' and available_at <= NOW() LIMIT $2", core.MessageStatusPending, limit)
+func (r *PostgresRepository) FetchPendingMessages(ctx context.Context, limit uint32, processingLockTimeout uint32) ([]core.OutboxMessage, error) {
+	query := `
+		WITH selected_messages AS (
+			SELECT *
+			FROM outbox
+			WHERE status = '$1' AND available_at <= NOW()
+			ORDER BY available_at ASC
+			LIMIT $2
+			FOR UPDATE SKIP LOCKED
+
+			UNION ALL
+
+			SELECT *
+			FROM outbox
+			WHERE status = '$3' AND available_at <= NOW() AND picked_at < NOW() - INTERVAL '$4 seconds'
+			ORDER BY available_at ASC
+			LIMIT $5
+			FOR UPDATE SKIP LOCKED
+		)
+		UPDATE outbox
+		SET status = '$6', picked_at = NOW()
+		WHERE id IN (
+			SELECT id
+			FROM selected_messages
+			ORDER BY available_at ASC
+			LIMIT $7
+		)
+		RETURNING id, payload, status, attempts;
+	`
+
+	rows, err := r.db.QueryContext(
+		ctx,
+		query,
+		core.MessageStatusPending,
+		limit,
+		core.MessageStatusProcessing,
+		processingLockTimeout,
+		limit,
+		core.MessageStatusProcessing,
+		limit,
+	)
+
 	if err != nil {
 		return nil, err
 	}
+
 	defer rows.Close()
 
 	var messages []core.OutboxMessage
+
 	for rows.Next() {
 		var message core.OutboxMessage
 		if err := rows.Scan(&message.ID, &message.Payload, &message.Status, &message.Attempts); err != nil {

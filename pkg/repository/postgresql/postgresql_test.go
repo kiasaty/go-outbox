@@ -116,7 +116,7 @@ func TestFetchPendingMessages(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	messages, err := repo.FetchPendingMessages(ctx, 10)
+	messages, err := repo.FetchPendingMessages(ctx, 10, 30)
 	require.NoError(t, err)
 	assert.Len(t, messages, 2, "Expected 2 pending messages")
 

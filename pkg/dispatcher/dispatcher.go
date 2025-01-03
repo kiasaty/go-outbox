@@ -13,7 +13,7 @@ type DefaultOutboxMessageDispatcher struct {
 }
 
 func (d *DefaultOutboxMessageDispatcher) Dispatch(ctx context.Context) error {
-	messages, err := d.repository.FetchPendingMessages(ctx, d.configs.FetchLimit)
+	messages, err := d.repository.FetchPendingMessages(ctx, d.configs.FetchLimit, d.configs.ProcessingLockTimeout)
 	if err != nil {
 		return fmt.Errorf("failed to fetch messages: %w", err)
 	}
@@ -25,14 +25,15 @@ func (d *DefaultOutboxMessageDispatcher) Dispatch(ctx context.Context) error {
 		}
 
 		err := d.publisher.Publish(ctx, message)
-		message.Attempts += 1
+
+		currentAttempt := message.Attempts + 1
 
 		if err != nil {
 			if message.GetRetryAttempts() < d.configs.Retry.MaxRetryAttempts {
 				_ = d.repository.MarkMessageForRetry(
 					ctx,
 					message.ID,
-					d.calculateRetryDelay(message.Attempts),
+					d.calculateRetryDelay(currentAttempt),
 					true,
 				)
 			} else {

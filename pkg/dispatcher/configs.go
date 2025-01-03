@@ -3,14 +3,16 @@ package dispatcher
 import "time"
 
 type DispatcherConfigs struct {
-	Retry      RetryConfigs
-	FetchLimit uint32 // Maximum number of messages fetched per batch
+	Retry                 RetryConfigs
+	FetchLimit            uint32 // Maximum number of messages fetched per batch.
+	ProcessingLockTimeout uint32 // Maximum duration (in seconds) a message remains locked for processing.
 }
 
 func DefaultDispatcherConfigs() DispatcherConfigs {
 	return DispatcherConfigs{
-		Retry:      DefaultRetryConfigs(),
-		FetchLimit: 100,
+		Retry:                 DefaultRetryConfigs(),
+		FetchLimit:            100,
+		ProcessingLockTimeout: 30,
 	}
 }
 

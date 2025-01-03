@@ -20,7 +20,7 @@ func (m *MockOutboxMessageRepository) SaveMessage(ctx context.Context, message c
 	return args.Error(0)
 }
 
-func (m *MockOutboxMessageRepository) FetchPendingMessages(ctx context.Context, limit int) ([]core.OutboxMessage, error) {
+func (m *MockOutboxMessageRepository) FetchPendingMessages(ctx context.Context, limit int, processingLockTimeout uint32) ([]core.OutboxMessage, error) {
 	args := m.Called(ctx, limit)
 	return args.Get(0).([]core.OutboxMessage), args.Error(1)
 }
@@ -61,7 +61,7 @@ func TestDefaultOutboxMessageDispatcher_Success(t *testing.T) {
 		{ID: "2", Payload: "Test Message 2", Status: core.MessageStatusPending},
 	}
 
-	mockRepo.On("FetchPendingMessages", ctx, dispatcher.configs.FetchLimit).Return(messages, nil)
+	mockRepo.On("FetchPendingMessages", ctx, dispatcher.configs.FetchLimit, dispatcher.configs.ProcessingLockTimeout).Return(messages, nil)
 	mockPub.On("Publish", ctx, messages[0]).Return(nil)
 	mockPub.On("Publish", ctx, messages[1]).Return(nil)
 	mockRepo.On("MarkMessageAsSent", ctx, "1").Return(nil)
@@ -91,7 +91,7 @@ func TestDefaultOutboxMessageDispatcher_PartialFailure(t *testing.T) {
 		{ID: "2", Payload: "Test Message 2", Status: core.MessageStatusPending},
 	}
 
-	mockRepo.On("FetchPendingMessages", ctx, dispatcher.configs.FetchLimit).Return(messages, nil)
+	mockRepo.On("FetchPendingMessages", ctx, dispatcher.configs.FetchLimit, dispatcher.configs.ProcessingLockTimeout).Return(messages, nil)
 	mockPub.On("Publish", ctx, messages[0]).Return(nil)                             // First succeeds
 	mockPub.On("Publish", ctx, messages[1]).Return(errors.New("failed to publish")) // Second fails
 	mockRepo.On("MarkMessageAsSent", ctx, "1").Return(nil)
@@ -117,7 +117,7 @@ func TestDefaultOutboxMessageDispatcher_RepositoryFetchError(t *testing.T) {
 	ctx := context.Background()
 
 	errorMessage := "fetch error"
-	mockRepo.On("FetchPendingMessages", ctx, dispatcher.configs.FetchLimit).Return([]core.OutboxMessage{}, errors.New(errorMessage))
+	mockRepo.On("FetchPendingMessages", ctx, dispatcher.configs.FetchLimit, dispatcher.configs.ProcessingLockTimeout).Return([]core.OutboxMessage{}, errors.New(errorMessage))
 
 	err := dispatcher.Dispatch(ctx)
 	assert.Error(t, err)

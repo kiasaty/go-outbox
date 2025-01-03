@@ -14,9 +14,10 @@ type OutboxMessage struct {
 type MessageStatus string
 
 const (
-	MessageStatusPending MessageStatus = "pending"
-	MessageStatusSent    MessageStatus = "sent"
-	MessageStatusFailed  MessageStatus = "failed"
+	MessageStatusPending    MessageStatus = "pending"
+	MessageStatusProcessing MessageStatus = "processing"
+	MessageStatusSent       MessageStatus = "sent"
+	MessageStatusFailed     MessageStatus = "failed"
 )
 
 func (m *OutboxMessage) GetRetryAttempts() uint8 {
